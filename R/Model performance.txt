@@ -1,0 +1,61 @@
+
+#KM-plots
+library(survival)
+library(survminer)
+library(rms)
+library(Publish)
+library(foreign)
+work=read.spss("work.sav",to.data.frame=TRUE)
+library(tidyverse)
+library(ggplot2)
+library(ggsurvfit)
+library(gghighlight)
+library(tidycmprsk)
+fit_surg <- coxph(Surv(OS, St2) ~ RS2, data = work)
+publish(fit_surg)
+fit1 = survfit(Surv(OS, St2) ~ RS2, data = work)
+fit1
+summary(fit1)
+summary(fit1, times = c(20,40,60,80,100,120)) 
+ggsurv1 <- ggsurvplot (fit1, 
+                       palette = c("tan2","seagreen","dodgerblue3","firebrick"), 
+                       xlim = c(0,103), 
+                       ylim = c(0, 1.03), 
+                       break.time.by = 25,
+                       censor.shape="+", censor.size = 4.5, 
+                       axes.offset = F )
+
+pdf(file="./5.2. Survival_Curves_Surgery.pdf", width=7, height=5.8, onefile = FALSE)
+ggsurv1
+dev.off() 
+
+#ROC
+getwd()
+library(foreign)
+work=read.spss("work.sav",to.data.frame=TRUE)
+attach(work)
+library("pROC")  
+roc<- roc(work$TLS, work$RS)   
+plot(roc, col="seagreen",lwd=3.6,identity.lty=2,identity.lwd=1.8)  
+
+
+#C-index and Nomogram
+library(foreign)
+work=read.spss("work.sav",to.data.frame=TRUE)
+library(survival)
+library(rms)
+coxm<-cph(Surv(OS,Status) ~ RS, data=work, surv=T)
+scoxm<-step(coxm)
+dd<-datadist(work)
+options(datadist="dd")
+surv<-Survival(scoxm)
+surv1<-function(x) surv(1*12, lp=x)
+surv2<-function(x) surv(3*12, lp=x)
+surv3<-function(x) surv(5*12, lp=x)
+nom<-nomogram(scoxm, fun=list(surv1, surv2, surv3), lp=F, funlabel=c('1-year survival', '3-year survival', '5-year survival'), 
+              maxscale=100, fun.at=c( 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1,0.01))
+plot(nom)
+Cindex <- rcorrcens(Surv(OS,St2)~predict(coxm))
+Cindex 
+
+

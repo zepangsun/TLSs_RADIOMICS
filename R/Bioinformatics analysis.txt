@@ -1,0 +1,69 @@
+#DEG
+foldChange=1 
+padj=0.05    
+library("edgeR")
+rt=read.table("geneMatrix.txt",sep="\t",header=T,check.names=F) 
+rt=as.matrix(rt)
+rownames(rt)=rt[,1]
+exp=rt[,2:ncol(rt)]
+dimnames=list(rownames(exp),colnames(exp))
+data=matrix(as.numeric(as.matrix(exp)),nrow=nrow(exp),dimnames=dimnames) 
+data=avereps(data)                     
+data=data[rowMeans(data)>1,]                    
+group=c(rep("normal",19),rep("tumor",23))                         
+design <- model.matrix(~group)
+y <- DGEList(counts=data,group=group)
+y <- calcNormFactors(y)          
+y <- estimateCommonDisp(y)
+y <- estimateTagwiseDisp(y)
+et <- exactTest(y,pair = c("normal","tumor"))
+topTags(et)
+ordered_tags <- topTags(et, n=100000)
+allDiff=ordered_tags$table
+allDiff=allDiff[is.na(allDiff$FDR)==FALSE,]
+diff=allDiff
+newData=y$pseudo.counts
+write.table(diff,file="edgerOut.xls",sep="\t",quote=F)
+diffSig = diff[(diff$FDR < padj & (diff$logFC>foldChange | diff$logFC<(-foldChange))),]
+write.table(diffSig, file="diffSig.xls",sep="\t",quote=F)
+diffUp = diff[(diff$FDR < padj & (diff$logFC>foldChange)),]
+write.table(diffUp, file="up.xls",sep="\t",quote=F)
+diffDown = diff[(diff$FDR < padj & (diff$logFC<(-foldChange))),]
+write.table(diffDown, file="down.xls",sep="\t",quote=F)
+normalizeExp=rbind(id=colnames(newData),newData)                                        
+write.table(normalizeExp,file="normalizeExp.txt",sep="\t",quote=F,col.names=F)  （normalizeExp.txt）
+diffExp=rbind(id=colnames(newData),newData[rownames(diffSig),])
+write.table(diffExp,file="diffmRNAExp.txt",sep="\t",quote=F,col.names=F)      
+
+#CNV
+rt=read.table("riskCliExp.txt",sep="\t",header=T,row.names=1,check.names=F)    #读取文件
+rt=t(rt)
+outpdf="heatmap.pdf"
+library(pheatmap)
+Type=read.table("riskCliGroup.sig.txt",sep="\t",header=T,row.names=1,check.names=F)
+Type=Type[order(Type$Risk),]
+rt=rt[,row.names(Type)]
+ann_colors = list(Risk = c(A = "darkslategray4", B = "firebrick"),
+                  sex = c(A = "darkslategray4", B = "firebrick"))
+pdf(outpdf,height=8,width=14)
+pheatmap(rt, annotation=Type, 
+         annotation_colors = ann_colors,
+         color = colorRampPalette(c("dodgerblue4","dodgerblue4","dodgerblue3","dodgerblue3","white","white","white","brown2","brown2","orangered4","orangered4"))(1000),
+         cluster_cols =F,
+         cluster_row = F, 
+         fontsize=7.5,
+         fontsize_row=8,
+         scale="row",
+         show_colnames=F,
+         fontsize_col=12)
+dev.off()
+
+#SM
+library(GenVisR)
+rt=read.table("waterfallInput2yes.txt",header=T,sep="\t",check.names=F,quote="")
+clinical=read.table("clinical2yes.txt",header=T,sep="\t",check.names=F)
+library(reshape2)
+clinical <- melt(clinical, id.vars = c("sample"))
+pdf(file="waterfall.pdf",height=8,width=12)
+waterfall(rt,clinDat = clinical,mainLabelSize=5,geneOrder=c("TP53","ARID1A","PIK3CA","NIPBL","APC","RNF43","CDH1","ARID2","MSH3","KRAS","FBXW7","NCOR1","CTNNB1","CHD3","CDKN2A","RHOA","LZTR1","ERBB2","BAP1","KEAP1","ELF3","KIT","MYC","RPS6KA3","NFE2L2"),clinLegCol=3)
+dev.off()

@@ -1,0 +1,74 @@
+
+#mRMRe algorithm
+library(mRMRe)
+data<-read.csv('C:/Users/123/Desktop/train.csv',header=T)
+feature_num = ncol(data) - 1
+train_feature = data[,0:feature_num] 
+train_label = data[,ncol(data)]
+mrmr_feature<-train_feature
+mrmr_feature$y<-train_label
+target_indices = which(names(mrmr_feature)=='y')
+for (m in which(sapply(mrmr_feature, class)!="numeric")){mrmr_feature[,m]=as.numeric(unlist(mrmr_feature[,m]))}
+Data <- mRMR.data(data = data.frame(mrmr_feature))
+mrmr=mRMR.ensemble(data = Data, target_indices = target_indices, 
+                   feature_count = 150, solution_count = 1)
+index=mrmr@filters[[as.character(mrmr@target_indices)]]
+new_data <- nrow(data):ncol(index)
+dim(new_data) <- c(nrow(data),ncol(index))
+new_data = data[,index]
+new_data_0 = cbind(new_data,train_label)
+write.csv (new_data_0,"C:/Users/123/Desktop/new selected_feature_without redundence.csv",row.names = F)
+
+#Correlation analysis
+library(foreign)
+work=read.csv("work.csv")
+attach(work)
+dim(work)
+head(work)
+work_matrix<-data.matrix(work)
+work_matrix
+a<-t(work_matrix)
+A<-data.frame(a)
+VAR00002_name1<-c()  
+VAR00003_name2<-c()  
+cor_r<-c()
+pvalue<-c()
+for (i in 1:nrow(A)){
+  for (r in i:nrow(A)){
+    g1=rownames(A)[i]
+    g2=rownames(A)[r]
+    c_r=cor(as.numeric(A[i,]),as.numeric(A[r,]),method="pearson")
+    p=cor.test(as.numeric(A[i,]),as.numeric(A[r,]),method ="pearson")[[3]]
+    VAR00002_name1=c(VAR00002_name1,g1)  #同步
+    VAR00003_name2=c(VAR00003_name2,g2)  #同步
+    cor_r=c(cor_r,c_r)
+    pvalue=c(pvalue,p)
+  }
+}
+data_cor<-data.frame(VAR00002_name1,VAR00003_name2,cor_r,pvalue)  #同步
+head(data_cor)
+write.csv (data_cor, file ="C:\\Users/123/Desktop/Result.csv")
+
+#LASSO
+library(foreign)
+work=read.spss("work.sav",to.data.frame=TRUE)
+library(Matrix)
+library(foreach)
+library(glmnet)
+work_matrix<-data.matrix(work)
+print(Matrix(work_matrix,sparse=T))
+work.outcome<-work$TLS
+work.x<-as.matrix(work[,1:115])
+set.seed(12345)
+fit3<-cv.glmnet(work.x, work.outcome, nfold=5,family="multinomial",nlambda=100, alpha=1)
+print(fit3)
+plot(fit3,xvar="lambda", label=TRUE)
+cvfit=cv.glmnet(work.x, work.outcome)
+plot(cvfit)
+cvfit$lambda.min
+cvfit$lambda.1se
+log(cvfit$lambda.min)
+l.coef2<-coef(cvfit$glmnet.fit, s=cvfit$lambda.min,exact = F)
+l.coef2
+fit4<-glmnet(work.x, work.outcome, family="multinomial")
+plot(fit4,xvar = "lambda")
